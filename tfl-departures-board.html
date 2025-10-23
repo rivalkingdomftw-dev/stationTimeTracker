@@ -1,0 +1,515 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no" />
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Live Departures — TfL</title>
+<style>
+  :root{
+    --bg:#0b1220; --card:#0f1724; --accent:#00b4ff; --text:#e6eef6;
+    --bakerloo:#B36305; --central:#E32017; --circle:#FFD300; --district:#00782A;
+    --hammersmith:#F3A9BB; --jubilee:#A0A5A9; --metropolitan:#9B0056; --northern:#000000;
+    --piccadilly:#003688; --victoria:#0098D4; --waterloo:#95CDBA; --elizabeth:#6950a1;
+    --dlr:#00A4A7; --overground:#EE7C0E; --c2c:#E91E63;
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;margin:0;background:linear-gradient(180deg,#071226,#06101a);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;-webkit-font-smoothing:antialiased;}
+  .wrap{max-width:1400px;margin:0 auto;padding:16px;padding-bottom:60px;}
+  h1{color:var(--text);margin:0 0 12px;font-weight:700;font-size:clamp(20px,5vw,28px);display:flex;align-items:center;gap:12px;}
+  .controls{display:flex;gap:12px;align-items:center;flex-wrap:wrap;}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px;margin-top:20px;}
+  .station{background:var(--card);padding:16px;border-radius:12px;box-shadow:0 6px 18px rgba(2,6,23,.45);color:var(--text);transition:transform .2s,box-shadow .2s;}
+  .station.hub{grid-column:1/-1;}
+  .station:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(2,6,23,.6);}
+  .station h2{margin:0 0 12px;font-size:clamp(18px,4vw,20px);font-weight:600;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;}
+  .station-name{flex:1;}
+  .departure-count{font-size:14px;color:#7a8fa3;font-weight:400;}
+  
+  .line-groups{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px;margin-top:8px;}
+  .line-group{background:rgba(255,255,255,.02);border-radius:10px;padding:12px;border:1px solid rgba(255,255,255,.05);}
+  .line-group-header{font-size:15px;font-weight:600;margin-bottom:10px;display:flex;align-items:center;gap:8px;color:#b8c7d8;}
+  .line-group-badge{display:inline-block;padding:3px 8px;border-radius:6px;font-size:12px;font-weight:700;letter-spacing:0.5px;}
+  
+  .line{display:flex;justify-content:space-between;padding:10px 12px;border-radius:8px;margin:6px 0;background:rgba(255,255,255,.03);align-items:center;transition:background .2s;}
+  .line:hover{background:rgba(255,255,255,.06);}
+  .line .left{display:flex;gap:12px;align-items:center;flex:1;min-width:0;}
+  .dot{width:14px;height:14px;border-radius:50%;background:var(--accent);flex:0 0 14px;box-shadow:0 0 8px currentColor;}
+  .line-info{flex:1;min-width:0;}
+  .line-name{font-weight:600;font-size:15px;margin-bottom:2px;}
+  .destination{font-size:13px;color:#9fb1c9;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .arrival-info{text-align:right;white-space:nowrap;}
+  .time{font-size:18px;font-weight:700;color:var(--accent);}
+  .time.due{color:#4ade80;}
+  .platform{font-size:12px;color:#7a8fa3;margin-top:2px;}
+  .meta{font-size:14px;color:#b8c7d8;}
+  #footer{margin-top:20px;color:#9fb1c9;font-size:13px;text-align:center;padding:12px;}
+  #refreshBtn{background:rgba(0,180,255,.1);border:1px solid rgba(0,180,255,.3);color:var(--accent);padding:8px 16px;border-radius:8px;cursor:pointer;font-weight:500;transition:all .2s;font-size:14px;-webkit-tap-highlight-color:transparent;}
+  #refreshBtn:hover{background:rgba(0,180,255,.2);border-color:rgba(0,180,255,.5);}
+  #refreshBtn:active{transform:scale(0.95);}
+  #refreshBtn:disabled{opacity:.5;cursor:not-allowed;}
+  #status{color:#7a8fa3;font-size:13px;}
+  .loading{opacity:.6;}
+  .spinner{display:inline-block;width:14px;height:14px;border:2px solid rgba(0,180,255,.3);border-top-color:var(--accent);border-radius:50%;animation:spin 1s linear infinite;margin-left:8px;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+  .error{background:rgba(227,32,23,.1);border:1px solid rgba(227,32,23,.3);padding:12px;border-radius:8px;margin-top:8px;font-size:14px;}
+  .empty{color:#7a8fa3;padding:12px;text-align:center;font-style:italic;}
+  .header-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:12px;}
+  
+  /* Line Status Styles */
+  .line-status-section{background:var(--card);padding:16px;border-radius:12px;box-shadow:0 6px 18px rgba(2,6,23,.45);color:var(--text);margin-top:20px;}
+  .line-status-section h2{margin:0 0 16px;font-size:20px;font-weight:600;color:var(--text);}
+  .line-status-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;}
+  .line-status-item{background:rgba(255,255,255,.02);border-radius:8px;padding:12px;border:1px solid rgba(255,255,255,.05);display:flex;align-items:center;gap:12px;}
+  .line-status-dot{width:12px;height:12px;border-radius:50%;flex:0 0 12px;}
+  .line-status-dot.good{background:#4ade80;}
+  .line-status-dot.minor{background:#f59e0b;}
+  .line-status-dot.severe{background:#dc2626;}
+  .line-status-dot.closed{background:#6b7280;}
+  .line-status-info{flex:1;min-width:0;}
+  .line-status-name{font-weight:600;font-size:14px;margin-bottom:2px;}
+  .line-status-desc{font-size:12px;color:#9fb1c9;font-weight:600;}
+  .line-status-reason{font-size:11px;color:#7a8fa3;margin-top:2px;}
+  
+  @media (max-width:768px){
+    .wrap{padding:12px;padding-bottom:50px;}
+    h1{font-size:22px;}
+    .grid{grid-template-columns:1fr;gap:12px;}
+    .line-groups{grid-template-columns:1fr;}
+    .controls{width:100%;justify-content:space-between;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="header-row">
+    <h1>
+      <span>Live Departures</span>
+    </h1>
+    <div class="controls">
+      <button id="refreshBtn">Refresh now</button>
+      <span id="status" class="meta"></span>
+    </div>
+  </div>
+
+  <div id="board" class="grid"></div>
+  
+  <div id="lineStatus" class="line-status-section" style="display:none;">
+    <h2>Line Status</h2>
+    <div id="lineStatusGrid" class="line-status-grid"></div>
+  </div>
+  
+  <div id="footer">Auto-refresh every <span id="intervalLabel">60s</span> • Data from TfL Unified API</div>
+</div>
+
+<script>
+const appKey = "93080ac2407241dcb83573c7ad599eb7";
+const REFRESH_MS = 60000; // 60 seconds
+const STATIONS = [
+  { id: "940GZZDLABR", isHub: true },  // Abbey Road DLR
+  { id: "940GZZLUWHM", isHub: true }   // West Ham (Hub)
+];
+
+const LINE_COLORS = {
+  'bakerloo': '#B36305',
+  'central': '#E32017',
+  'circle': '#FFD300',
+  'district': '#00782A',
+  'hammersmith-city': '#F3A9BB',
+  'hammersmith & city': '#F3A9BB',
+  'jubilee': '#A0A5A9',
+  'metropolitan': '#9B0056',
+  'northern': '#000000',
+  'piccadilly': '#003688',
+  'victoria': '#0098D4',
+  'waterloo-city': '#95CDBA',
+  'waterloo & city': '#95CDBA',
+  'elizabeth': '#6950a1',
+  'elizabeth line': '#6950a1',
+  'dlr': '#00A4A7',
+  'london-overground': '#EE7C0E',
+  'london overground': '#EE7C0E',
+  'overground': '#EE7C0E',
+  'tram': '#84B817',
+  'c2c': '#E91E63'
+};
+
+const boardEl = document.getElementById('board');
+const statusEl = document.getElementById('status');
+const intervalLabel = document.getElementById('intervalLabel');
+const refreshBtn = document.getElementById('refreshBtn');
+const lineStatusEl = document.getElementById('lineStatus');
+const lineStatusGridEl = document.getElementById('lineStatusGrid');
+
+intervalLabel.textContent = (REFRESH_MS/1000) + "s";
+
+let refreshTimer;
+let isUpdating = false;
+
+refreshBtn.addEventListener('click', () => { 
+  if (!isUpdating) {
+    clearInterval(refreshTimer);
+    updateAll(true);
+    updateLineStatus();
+    refreshTimer = setInterval(() => {
+      updateAll(false);
+      updateLineStatus();
+    }, REFRESH_MS);
+  }
+});
+
+function makeTfLUrl(path){
+  if(!appKey) return `https://api.tfl.gov.uk${path}`;
+  const sep = path.includes('?') ? '&' : '?';
+  return `https://api.tfl.gov.uk${path}${sep}app_key=${encodeURIComponent(appKey)}`;
+}
+
+async function fetchArrivalsFor(stopPointId){
+  const url = makeTfLUrl(`/StopPoint/${encodeURIComponent(stopPointId)}/Arrivals`);
+  const resp = await fetch(url, {
+    mode: 'cors',
+    headers: {
+      'Accept': 'application/json'
+    }
+  });
+  if(!resp.ok) throw new Error(`HTTP ${resp.status} ${resp.statusText}`);
+  const json = await resp.json();
+  return json;
+}
+
+async function fetchLineStatus(){
+  const url = makeTfLUrl('/Line/Mode/tube,dlr,overground,elizabeth-line/Status');
+  const resp = await fetch(url, {
+    mode: 'cors',
+    headers: {
+      'Accept': 'application/json'
+    }
+  });
+  if(!resp.ok) throw new Error(`HTTP ${resp.status} ${resp.statusText}`);
+  const json = await resp.json();
+  return json;
+}
+
+function getStatusSeverityClass(severityLevel){
+  if(severityLevel <= 3) return 'good';
+  if(severityLevel <= 6) return 'minor';
+  if(severityLevel <= 9) return 'severe';
+  return 'closed';
+}
+
+function renderLineStatus(lineData){
+  const item = document.createElement('div');
+  item.className = 'line-status-item';
+  
+  const status = lineData.lineStatuses[0];
+  const severityClass = getStatusSeverityClass(status.statusSeverity);
+  
+  const dot = document.createElement('div');
+  dot.className = `line-status-dot ${severityClass}`;
+  
+  const info = document.createElement('div');
+  info.className = 'line-status-info';
+  
+  const name = document.createElement('div');
+  name.className = 'line-status-name';
+  name.textContent = lineData.name;
+  
+  const desc = document.createElement('div');
+  desc.className = 'line-status-desc';
+  desc.textContent = status.statusSeverityDescription;
+  
+  // Add additional descriptive text if available
+  if(status.reason){
+    const reason = document.createElement('div');
+    reason.className = 'line-status-reason';
+    reason.textContent = status.reason;
+    info.appendChild(reason);
+  }
+  
+  info.appendChild(name);
+  info.appendChild(desc);
+  
+  item.appendChild(dot);
+  item.appendChild(info);
+  
+  return item;
+}
+
+async function updateLineStatus(){
+  try{
+    const lineStatusData = await fetchLineStatus();
+    
+    lineStatusGridEl.innerHTML = '';
+    
+    // Filter out lines with "Good Service" status
+    const linesWithIssues = lineStatusData.filter(line => {
+      const status = line.lineStatuses[0];
+      return status.statusSeverityDescription !== 'Good Service';
+    });
+    
+    if(linesWithIssues.length === 0){
+      lineStatusEl.style.display = 'none';
+      return;
+    }
+    
+    linesWithIssues.forEach(line => {
+      lineStatusGridEl.appendChild(renderLineStatus(line));
+    });
+    
+    lineStatusEl.style.display = 'block';
+  }catch(err){
+    console.error('Failed to fetch line status:', err);
+    lineStatusEl.style.display = 'none';
+  }
+}
+
+function minutesFromSeconds(sec){
+  const mins = Math.max(0, Math.round(sec/60));
+  return mins;
+}
+
+function formatTime(mins){
+  return mins === 0 ? 'Due' : mins + ' min';
+}
+
+function cleanDestinationName(name) {
+  if (!name) return '';
+  return name
+    .replace(/\s+DLR\s+Station$/i, '')
+    .replace(/\s+Underground\s+Station$/i, '')
+    .replace(/\s+Station$/i, '')
+    .replace(/\s+International\s+DLR\s+Station$/i, ' International')
+    .trim();
+}
+
+function getLineColor(lineName){
+  const key = lineName.toLowerCase().trim();
+  return LINE_COLORS[key] || '#00b4ff';
+}
+
+function renderLine(a){
+  const line = document.createElement('div');
+  line.className='line';
+  
+  const left = document.createElement('div');
+  left.className='left';
+  
+  const dot = document.createElement('div');
+  dot.className='dot';
+  const lineColor = getLineColor(a.lineName);
+  dot.style.background = lineColor;
+  dot.style.color = lineColor;
+  
+  const lineInfo = document.createElement('div');
+  lineInfo.className='line-info';
+  
+  const lineName = document.createElement('div');
+  lineName.className='line-name';
+  lineName.textContent = cleanDestinationName(a.destinationName);
+  
+  lineInfo.appendChild(lineName);
+  
+  const arrivalInfo = document.createElement('div');
+  arrivalInfo.className='arrival-info';
+  
+  const mins = minutesFromSeconds(a.timeToStation);
+  const time = document.createElement('div');
+  time.className='time';
+  if(mins === 0) time.classList.add('due');
+  time.textContent = formatTime(mins);
+  
+  arrivalInfo.appendChild(time);
+  
+  left.appendChild(dot);
+  left.appendChild(lineInfo);
+  line.appendChild(left);
+  line.appendChild(arrivalInfo);
+  
+  return line;
+}
+
+function renderStationSimple(name, arrivals, stationId){
+  const container = document.createElement('div');
+  container.className = 'station';
+  
+  const h = document.createElement('h2');
+  const nameSpan = document.createElement('span');
+  nameSpan.className = 'station-name';
+  nameSpan.textContent = name;
+  h.appendChild(nameSpan);
+  
+  
+  container.appendChild(h);
+
+  if(arrivals.length === 0){
+    const p = document.createElement('div');
+    p.className='empty';
+    p.textContent = 'No upcoming departures';
+    container.appendChild(p);
+    return container;
+  }
+
+  // Group by platform
+  const platformGroups = {};
+  arrivals.forEach(a => {
+    const platform = a.platformName || 'Unknown Platform';
+    if(!platformGroups[platform]) platformGroups[platform] = [];
+    platformGroups[platform].push(a);
+  });
+
+  const lineGroupsContainer = document.createElement('div');
+  lineGroupsContainer.className = 'line-groups';
+
+  Object.keys(platformGroups).sort().forEach(platform => {
+    const groupArrivals = platformGroups[platform];
+    
+    const groupDiv = document.createElement('div');
+    groupDiv.className = 'line-group';
+    
+    const header = document.createElement('div');
+    header.className = 'line-group-header';
+    header.textContent = `${platform}`;
+    
+    groupDiv.appendChild(header);
+    
+    groupArrivals.slice(0,4).forEach(a => {
+      groupDiv.appendChild(renderLine(a));
+    });
+    
+    lineGroupsContainer.appendChild(groupDiv);
+  });
+
+  container.appendChild(lineGroupsContainer);
+  return container;
+}
+
+function renderStationHub(name, arrivals, stationId){
+  const container = document.createElement('div');
+  container.className = 'station hub';
+  
+  const h = document.createElement('h2');
+  const nameSpan = document.createElement('span');
+  nameSpan.className = 'station-name';
+  nameSpan.textContent = name;
+  h.appendChild(nameSpan);
+  
+  
+  container.appendChild(h);
+
+  if(arrivals.length === 0){
+    const p = document.createElement('div');
+    p.className='empty';
+    p.textContent = 'No upcoming departures';
+    container.appendChild(p);
+    return container;
+  }
+
+  // Group by platform
+  const platformGroups = {};
+  arrivals.forEach(a => {
+    const platform = a.platformName || 'Unknown Platform';
+    if(!platformGroups[platform]) platformGroups[platform] = [];
+    platformGroups[platform].push(a);
+  });
+
+  const lineGroupsContainer = document.createElement('div');
+  lineGroupsContainer.className = 'line-groups';
+
+  Object.keys(platformGroups).sort().forEach(platform => {
+    const groupArrivals = platformGroups[platform];
+    
+    const groupDiv = document.createElement('div');
+    groupDiv.className = 'line-group';
+    
+    const header = document.createElement('div');
+    header.className = 'line-group-header';
+    header.textContent = `${platform}`;
+    
+    groupDiv.appendChild(header);
+    
+    groupArrivals.slice(0,4).forEach(a => {
+      groupDiv.appendChild(renderLine(a));
+    });
+    
+    lineGroupsContainer.appendChild(groupDiv);
+  });
+
+  container.appendChild(lineGroupsContainer);
+  return container;
+}
+
+async function updateAll(forced=false){
+  if(isUpdating) return;
+  
+  try{
+    isUpdating = true;
+    refreshBtn.disabled = true;
+    statusEl.innerHTML = 'Updating<span class="spinner"></span>';
+    
+    if(STATIONS.length === 0){
+      boardEl.innerHTML = `<div class="station"><h2>No stations configured</h2><div class="meta">Add TfL StopPoint IDs to the STATIONS array.</div></div>`;
+      statusEl.textContent = '';
+      return;
+    }
+
+    const promises = STATIONS.map(station => 
+      fetchArrivalsFor(station.id)
+        .then(json => ({station, json, success: true}))
+        .catch(err => ({station, error: err.message, success: false}))
+    );
+    const results = await Promise.all(promises);
+
+    boardEl.innerHTML = '';
+    
+    for(const r of results){
+      if(!r.success){
+        const el = document.createElement('div');
+        el.className='station';
+        el.innerHTML = `<h2>${r.station.id}</h2><div class="error">⚠️ ${r.error}<br><small>Check your API key and network connection. Make sure CORS is allowed.</small></div>`;
+        boardEl.appendChild(el);
+        continue;
+      }
+      
+      const label = (r.json[0] && r.json[0].stationName) || r.station.id;
+      const sorted = r.json.sort((a,b) => a.timeToStation - b.timeToStation);
+      
+      if(r.station.isHub){
+        boardEl.appendChild(renderStationHub(label, sorted, r.station.id));
+      } else {
+        boardEl.appendChild(renderStationSimple(label, sorted, r.station.id));
+      }
+    }
+    
+    const now = new Date();
+    statusEl.textContent = `Updated ${now.toLocaleTimeString()}`;
+  }catch(err){
+    statusEl.innerHTML = `<span style="color:#E32017">⚠️ Update failed: ${err.message}</span>`;
+  }finally{
+    isUpdating = false;
+    refreshBtn.disabled = false;
+  }
+}
+
+updateAll();
+updateLineStatus();
+refreshTimer = setInterval(() => {
+  updateAll(false);
+  updateLineStatus();
+}, REFRESH_MS);
+
+// Helper function for finding station IDs (use in browser console)
+async function searchStation(name){
+  try{
+    const url = makeTfLUrl(`/StopPoint/Search/${encodeURIComponent(name)}?modes=tube,dlr,overground,elizabeth-line`);
+    const res = await fetch(url);
+    const j = await res.json();
+    console.log('Search results for:', name, j);
+    return j;
+  }catch(e){
+    console.error(e);
+  }
+}
+</script>
+</body>
+</html>
