@@ -202,10 +202,11 @@ function renderLineStatus(lineData){
   item.className = 'line-status-item';
   
   const status = lineData.lineStatuses[0];
-  const severityClass = getStatusSeverityClass(status.statusSeverity);
   
   const dot = document.createElement('div');
-  dot.className = `line-status-dot ${severityClass}`;
+  dot.className = 'line-status-dot';
+  const lineColor = getLineColor(lineData.id);
+  dot.style.background = lineColor;
   
   const info = document.createElement('div');
   info.className = 'line-status-info';
@@ -396,9 +397,21 @@ function renderStationHub(name, arrivals, stationId){
     return container;
   }
 
+  // Filter out Eastbound - Platform 6 trains to Stratford for West Ham
+  let filteredArrivals = arrivals;
+  if(stationId === '940GZZLUWHM'){
+    filteredArrivals = arrivals.filter(a => {
+      const isStratfordEastbound = 
+        a.platformName === 'Eastbound - Platform 6' && 
+        a.destinationName && 
+        a.destinationName.toLowerCase().includes('stratford');
+      return !isStratfordEastbound;
+    });
+  }
+
   // Group by platform
   const platformGroups = {};
-  arrivals.forEach(a => {
+  filteredArrivals.forEach(a => {
     const platform = a.platformName || 'Unknown Platform';
     if(!platformGroups[platform]) platformGroups[platform] = [];
     platformGroups[platform].push(a);
