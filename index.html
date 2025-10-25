@@ -104,7 +104,7 @@
 
 <script>
 const appKey = "93080ac2407241dcb83573c7ad599eb7";
-const REFRESH_MS = 60000; // 60 seconds
+const REFRESH_MS = 30000; // 30 seconds
 const STATIONS = [
   { id: "940GZZDLABR", isHub: true },  // Abbey Road DLR
   { id: "940GZZLUWHM", isHub: true }   // West Ham (Hub)
@@ -258,7 +258,8 @@ async function updateLineStatus(){
 
 function minutesFromSeconds(sec){
   const mins = Math.max(0, Math.round(sec/60));
-  return mins;
+  // Subtract 1 minute to give extra time to catch the train
+  return Math.max(0, mins - 1);
 }
 
 function formatTime(mins){
